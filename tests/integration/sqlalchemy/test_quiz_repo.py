@@ -7,24 +7,18 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.adapters.sqlalchemy.repositories.quiz import QuizRepositorySqlAlchemy
 from src.application.domain.exceptions import DuplicateItem, ItemNotFound
-from src.adapters.sqlalchemy.mappers import QuizSQLAlchemyMapper
 from src.adapters.sqlalchemy.models import QuizModel, SubjectModel
 from src.application.domain.quiz import ChoiceAnswer, ChoiceQuestion, Difficulty, Quiz, Subject
-from src.adapters.sqlalchemy.quiz_admin_repo import AdminRepositorySqlAlchemy
 from tests.integration.sqlalchemy.connect import get_nested_test_session
 
 
 @pytest_asyncio.fixture(scope="function", name="admin_repo")
 async def admin_repo_f(
     session_with_default_dataset: AsyncSession,
-) -> AsyncGenerator[AdminRepositorySqlAlchemy, Any]:
-    yield AdminRepositorySqlAlchemy(
-        QuizModel,
-        QuizModel.id,
-        session_with_default_dataset,
-        QuizSQLAlchemyMapper(),
-    )
+) -> AsyncGenerator[QuizRepositorySqlAlchemy, Any]:
+    yield QuizRepositorySqlAlchemy(session_with_default_dataset)
 
 
 @pytest_asyncio.fixture(name="session_with_default_dataset", scope="function")
@@ -95,7 +89,7 @@ async def session_with_default_dataset_f():
 
 @pytest.mark.asyncio
 async def test_add_one_success(
-    admin_repo: AdminRepositorySqlAlchemy, session_with_default_dataset: AsyncSession
+    admin_repo: QuizRepositorySqlAlchemy, session_with_default_dataset: AsyncSession
 ):
     new_quiz = Quiz(
         id=UUID("00000000-0000-0000-0000-000000000003"),
@@ -139,9 +133,7 @@ async def test_add_one_success(
 
 
 @pytest.mark.asyncio
-async def test_add_one_duplicate(
-    admin_repo: AdminRepositorySqlAlchemy
-):
+async def test_add_one_duplicate(admin_repo: QuizRepositorySqlAlchemy):
     new_quiz = Quiz(
         id=UUID("00000000-0000-0000-0000-000000000001"),
         name="quiz3",
@@ -170,9 +162,7 @@ async def test_add_one_duplicate(
 
 
 @pytest.mark.asyncio
-async def test_add_one_not_found_foreign_key(
-    admin_repo: AdminRepositorySqlAlchemy
-):
+async def test_add_one_not_found_foreign_key(admin_repo: QuizRepositorySqlAlchemy):
     new_quiz = Quiz(
         id=UUID("00000000-0000-0000-0000-000000000003"),
         name="quiz3",
@@ -201,15 +191,16 @@ async def test_add_one_not_found_foreign_key(
 
 
 @pytest.mark.asyncio
-async def test_get_all(admin_repo: AdminRepositorySqlAlchemy):
+async def test_get_all(admin_repo: QuizRepositorySqlAlchemy):
     quizzes = await admin_repo.get_all()
     quizzes_list = list(quizzes)
     assert len(quizzes_list) == 1
     assert quizzes_list[0].name == "quiz1"
+    assert isinstance(quizzes_list[0], Quiz)
 
 
 @pytest.mark.asyncio
-async def test_update_one(admin_repo: AdminRepositorySqlAlchemy, session_with_default_dataset: AsyncSession):
+async def test_update_one(admin_repo: QuizRepositorySqlAlchemy, session_with_default_dataset: AsyncSession):
     updated_quiz = Quiz(
         id=UUID("00000000-0000-0000-0000-000000000001"),
         name="updated quiz1",
@@ -248,7 +239,7 @@ async def test_update_one(admin_repo: AdminRepositorySqlAlchemy, session_with_de
 
 
 @pytest.mark.asyncio
-async def test_update_one_not_found(admin_repo: AdminRepositorySqlAlchemy):
+async def test_update_one_not_found(admin_repo: QuizRepositorySqlAlchemy):
     updated_quiz = Quiz(
         id=UUID("00000000-0000-0000-0000-000000000100"),
         name="updated quiz1",
@@ -279,7 +270,36 @@ async def test_update_one_not_found(admin_repo: AdminRepositorySqlAlchemy):
 
 
 @pytest.mark.asyncio
-async def test_delete_one(admin_repo: AdminRepositorySqlAlchemy, session_with_default_dataset: AsyncSession):
+async def test_update_one_not_found_foreign_key(admin_repo: QuizRepositorySqlAlchemy):
+    updated_quiz = Quiz(
+        id=UUID("00000000-0000-0000-0000-000000000001"),
+        name="quiz3",
+        description="quiz3 description",
+        _time=timedelta(minutes=10),
+        difficulty=Difficulty.MEDIUM,
+        subject=Subject(
+            id=UUID("00000000-0000-0000-0000-000000000100"),
+            name="subject1",
+            description="subject1",
+        ),
+        _questions=[
+            ChoiceQuestion(
+                id=UUID("00000000-0000-0000-0000-000000000005"),
+                text="New question",
+                _answers=[
+                    ChoiceAnswer(
+                        id=UUID("00000000-0000-0000-0000-000000000005"), text="New answer", is_correct=True
+                    )
+                ],
+            )
+        ],
+    )
+    with pytest.raises(ItemNotFound):
+        await admin_repo.update_one(updated_quiz.id, updated_quiz)
+
+
+@pytest.mark.asyncio
+async def test_delete_one(admin_repo: QuizRepositorySqlAlchemy, session_with_default_dataset: AsyncSession):
     quiz_id = UUID("00000000-0000-0000-0000-000000000001")
     deleted_id = await admin_repo.delete_one(quiz_id)
     assert deleted_id == quiz_id
@@ -289,7 +309,7 @@ async def test_delete_one(admin_repo: AdminRepositorySqlAlchemy, session_with_de
 
 
 @pytest.mark.asyncio
-async def test_delete_one_not_found(admin_repo: AdminRepositorySqlAlchemy):
+async def test_delete_one_not_found(admin_repo: QuizRepositorySqlAlchemy):
     quiz_id = UUID("00000000-0000-0000-0000-000000000100")
     with pytest.raises(ItemNotFound):
         await admin_repo.delete_one(quiz_id)
