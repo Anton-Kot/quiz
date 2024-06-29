@@ -25,14 +25,14 @@ class AdminRepositorySqlAlchemy:
                 insert(self.model).returning(self.model_key_field),
                 self.dict_mapper.domain_to_dict(domain_object),
             )
-            return row_id
+            return str(row_id)
 
         except IntegrityError as e:
             await sqlalchemy_asyncpg_exception_mapper(e)
 
     async def get_all(self):
-        result = await self.session.scalars(select(self.model))
-        return (r for r in result)
+        quizzes = await self.session.scalars(select(self.model))
+        return (self.dict_mapper.model_to_domain(quiz) for quiz in quizzes)
 
     async def update_one(self, key, updated_domain_object):
         try:
