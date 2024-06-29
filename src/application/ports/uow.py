@@ -1,8 +1,6 @@
 from contextlib import AbstractAsyncContextManager
 from typing import Protocol
 
-from src.application.ports.quiz_admin_repo import AdminRepository
-
 
 class UnitOfWork(AbstractAsyncContextManager, Protocol):
     """
@@ -25,10 +23,3 @@ class UnitOfWork(AbstractAsyncContextManager, Protocol):
     async def commit(self): ...
 
     async def rollback(self): ...
-
-
-class AdminUnitOfWork(UnitOfWork):
-    repo: AdminRepository
-
-    def __init__(self, repo: AdminRepository):
-        self.repo = repo

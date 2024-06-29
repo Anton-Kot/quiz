@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 from datetime import timedelta
 import pytest
 
-from src.application.ports.uow import AdminUnitOfWork
+from src.application.ports.uow import UnitOfWork
 from src.application.domain.quiz import ChoiceAnswer, ChoiceQuestion, Quiz, Subject
 from src.application.quiz_admin import (
     SubjectDTO,
@@ -15,7 +15,7 @@ from src.application.quiz_admin import (
 )
 
 
-class FakeUoW(AdminUnitOfWork):
+class FakeUoW(UnitOfWork):
     commited = False
 
     async def commit(self):
@@ -26,18 +26,18 @@ class FakeUoW(AdminUnitOfWork):
 
 @pytest.fixture(name="mock_uow")
 def mock_uow_f():
-    uow = FakeUoW(repo=AsyncMock())
+    uow = FakeUoW()
     return uow
 
 
 @pytest.fixture(name="subject_admin_service")
 def subject_admin_service_f(mock_uow):
-    return SubjectAdminService(uow=mock_uow)
+    return SubjectAdminService(uow=mock_uow, repo=AsyncMock())
 
 
 @pytest.fixture(name="quiz_admin_service")
 def quiz_admin_service_f(mock_uow):
-    return QuizAdminService(uow=mock_uow)
+    return QuizAdminService(uow=mock_uow, repo=AsyncMock())
 
 
 @pytest.mark.asyncio
@@ -45,11 +45,11 @@ async def test_create_one_subject(subject_admin_service):
     # Test data
     dto = SubjectDTO(name="History", description="History Subject")
     mock_uow = subject_admin_service.uow
-    mock_uow.repo.add_one.return_value = uuid4()
+    subject_admin_service.repo.add_one.return_value = uuid4()
 
     # Test create_one
     created_id = await subject_admin_service.create_one(dto)
-    assert mock_uow.repo.add_one.called
+    assert subject_admin_service.repo.add_one.called
     assert mock_uow.commited
     assert isinstance(created_id, UUID)
 
@@ -59,8 +59,7 @@ async def test_get_all_subjects(subject_admin_service):
     # Test data
     subject_id = uuid4()
     domain_object = Subject(id=subject_id, name="Geography", description="Geography Subject")
-    mock_uow = subject_admin_service.uow
-    mock_uow.repo.get_all.return_value = [domain_object]
+    subject_admin_service.repo.get_all.return_value = [domain_object]
 
     # Test get_all
     result = await subject_admin_service.get_all()
@@ -76,11 +75,11 @@ async def test_update_one_subject(subject_admin_service):
     subject_id = uuid4()
     dto = SubjectDTO(name="Updated History", description="Updated History Subject")
     mock_uow = subject_admin_service.uow
-    mock_uow.repo.update_one.return_value = subject_id
+    subject_admin_service.repo.update_one.return_value = subject_id
 
     # Test update_one
     updated_id = await subject_admin_service.update_one(subject_id, dto)
-    assert mock_uow.repo.update_one.called
+    assert subject_admin_service.repo.update_one.called
     assert mock_uow.commited
     assert updated_id == subject_id
 
@@ -90,11 +89,11 @@ async def test_delete_one_subject(subject_admin_service):
     # Test data
     subject_id = uuid4()
     mock_uow = subject_admin_service.uow
-    mock_uow.repo.delete_one.return_value = subject_id
+    subject_admin_service.repo.delete_one.return_value = subject_id
 
     # Test delete_one
     deleted_id = await subject_admin_service.delete_one(subject_id)
-    assert mock_uow.repo.delete_one.called
+    assert subject_admin_service.repo.delete_one.called
     assert mock_uow.commited
     assert deleted_id == subject_id
 
@@ -114,11 +113,11 @@ async def test_create_one_quiz(quiz_admin_service):
         questions=[question_edit_dto],
     )
     mock_uow = quiz_admin_service.uow
-    mock_uow.repo.add_one.return_value = uuid4()
+    quiz_admin_service.repo.add_one.return_value = uuid4()
 
     # Test create_one
     created_id = await quiz_admin_service.create_one(dto)
-    assert mock_uow.repo.add_one.called
+    assert quiz_admin_service.repo.add_one.called
     assert mock_uow.commited
     assert isinstance(created_id, UUID)
 
@@ -139,8 +138,7 @@ async def test_get_all_quizzes(quiz_admin_service):
         subject=subject,
         _questions=[question],
     )
-    mock_uow = quiz_admin_service.uow
-    mock_uow.repo.get_all.return_value = [domain_object]
+    quiz_admin_service.repo.get_all.return_value = [domain_object]
 
     # Test get_all
     result = await quiz_admin_service.get_all()
@@ -166,11 +164,11 @@ async def test_update_one_quiz(quiz_admin_service):
         questions=[question_edit_dto],
     )
     mock_uow = quiz_admin_service.uow
-    mock_uow.repo.update_one.return_value = quiz_id
+    quiz_admin_service.repo.update_one.return_value = quiz_id
 
     # Test update_one
     updated_id = await quiz_admin_service.update_one(quiz_id, dto)
-    assert mock_uow.repo.update_one.called
+    assert quiz_admin_service.repo.update_one.called
     assert mock_uow.commited
     assert updated_id == quiz_id
 
@@ -180,10 +178,10 @@ async def test_delete_one_quiz(quiz_admin_service):
     # Test data
     quiz_id = uuid4()
     mock_uow = quiz_admin_service.uow
-    mock_uow.repo.delete_one.return_value = quiz_id
+    quiz_admin_service.repo.delete_one.return_value = quiz_id
 
     # Test delete_one
     deleted_id = await quiz_admin_service.delete_one(quiz_id)
-    assert mock_uow.repo.delete_one.called
+    assert quiz_admin_service.repo.delete_one.called
     assert mock_uow.commited
     assert deleted_id == quiz_id
