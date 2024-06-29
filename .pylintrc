@@ -1,0 +1,4 @@
+[MAIN]
+max-line-length=110
+disable=C0111
+ignored-modules=alembic.context, alembic.op
