@@ -1,0 +1,13 @@
+from typing import Protocol
+from uuid import UUID
+from src.application.domain.quiz import Subject
+
+
+class SubjectRepository(Protocol):
+    async def add_one(self, subject: Subject) -> UUID: ...
+
+    async def get_all(self) -> list[Subject]: ...
+
+    async def update_one(self, subject_id, new_subject: Subject) -> UUID: ...
+
+    async def delete_one(self, subject_id) -> UUID: ...

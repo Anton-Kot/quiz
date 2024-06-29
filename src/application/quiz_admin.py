@@ -1,9 +1,11 @@
 from dataclasses import dataclass
-from typing import Generic, Optional, Protocol, TypeVar
+from typing import Optional, Protocol
 from datetime import timedelta
 from uuid import UUID, uuid4
+from src.application.ports.quiz import QuizRepository
+from src.application.ports.subject import SubjectRepository
 from src.application.domain.quiz import ChoiceAnswer, ChoiceQuestion, Difficulty, Quiz, Subject
-from src.application.ports.uow import AdminUnitOfWork
+from src.application.ports.uow import UnitOfWork
 
 
 @dataclass
@@ -36,9 +38,6 @@ class ChoiceAnswerAdminDTO:
     is_correct: bool
     text: str
     id: Optional[UUID] = None
-
-
-T = TypeVar("T")
 
 
 class DomainMapper(Protocol):
@@ -125,43 +124,81 @@ class QuizDomainMapper:
         )
 
 
-class AdminService(Generic[T]):
-    uow: AdminUnitOfWork
+class BaseAdminService:
+    uow: UnitOfWork
     domain_mapper: DomainMapper
 
-    def __init__(self, uow):
+    def __init__(self, uow, repo, domain_mapper):
         self.uow = uow
+        self.repo = repo
+        self.domain_mapper = domain_mapper
 
-    async def create_one(self, dto: T) -> UUID:
+    async def create_one(self, dto):
         async with self.uow as uow:
             new_object = self.domain_mapper.map_dto_to_domain_object(dto)
-            created = await uow.repo.add_one(new_object)
+            created = await self.repo.add_one(new_object)
             await uow.commit()
             return created
 
-    async def get_all(self) -> list[T]:
-        async with self.uow as uow:
-            objects = await uow.repo.get_all()
+    async def get_all(self):
+        async with self.uow:
+            objects = await self.repo.get_all()
             return [self.domain_mapper.map_domain_object_to_dto(obj) for obj in objects]
 
-    async def update_one(self, object_id, dto: T) -> UUID:
+    async def update_one(self, object_id, dto):
         async with self.uow as uow:
             dto.id = object_id
             updated_object = self.domain_mapper.map_dto_to_domain_object(dto)
-            updated = await uow.repo.update_one(object_id, updated_object)
+            updated = await self.repo.update_one(object_id, updated_object)
             await uow.commit()
             return updated
 
     async def delete_one(self, object_id: UUID) -> UUID:
         async with self.uow as uow:
-            deleted = await uow.repo.delete_one(object_id)
+            deleted = await self.repo.delete_one(object_id)
             await uow.commit()
             return deleted
 
 
-class SubjectAdminService(AdminService[SubjectDTO]):
-    domain_mapper = SubjectDomainMapper()
+class SubjectAdminService:
+    uow: UnitOfWork
+    repo: SubjectRepository
+
+    def __init__(self, uow: UnitOfWork, repo: SubjectRepository):
+        self.uow = uow
+        self.repo = repo
+        self.base_service = BaseAdminService(uow, repo, SubjectDomainMapper())
+
+    async def create_one(self, subject_dto: SubjectDTO) -> UUID:
+        return await self.base_service.create_one(subject_dto)
+
+    async def get_all(self) -> list[SubjectDTO]:
+        return await self.base_service.get_all()
+
+    async def update_one(self, subject_id, subject_dto: SubjectDTO) -> UUID:
+        return await self.base_service.update_one(subject_id, subject_dto)
+
+    async def delete_one(self, subject_id: UUID) -> UUID:
+        return await self.base_service.delete_one(subject_id)
 
 
-class QuizAdminService(AdminService[QuizAdminDTO]):
-    domain_mapper = QuizDomainMapper()
+class QuizAdminService:
+    uow: UnitOfWork
+    repo: QuizRepository
+
+    def __init__(self, uow: UnitOfWork, repo: QuizRepository):
+        self.uow = uow
+        self.repo = repo
+        self.base_service = BaseAdminService(uow, repo, QuizDomainMapper())
+
+    async def create_one(self, quiz_dto: QuizAdminDTO) -> UUID:
+        return await self.base_service.create_one(quiz_dto)
+
+    async def get_all(self) -> list[QuizAdminDTO]:
+        return await self.base_service.get_all()
+
+    async def update_one(self, quiz_id, quiz_dto: QuizAdminDTO) -> UUID:
+        return await self.base_service.update_one(quiz_id, quiz_dto)
+
+    async def delete_one(self, quiz_id: UUID) -> UUID:
+        return await self.base_service.delete_one(quiz_id)

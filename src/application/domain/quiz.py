@@ -74,6 +74,8 @@ class Quiz:
     difficulty: Difficulty
     subject: Subject
     _questions: list[BaseQuestion]
+    # BaseQuestion: нарушение LSP, слишком общий родитель не отражающий сути наследников.
+    # => нарушение OCP, т.к. Quiz начинает иметь специфику вида Question.
 
     def __post_init__(self):
         self._validate_time(self._time)
