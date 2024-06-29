@@ -5,8 +5,9 @@ import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
+from alembic.command import downgrade, upgrade
+from alembic.config import Config
 
-from src.adapters.sqlalchemy.connect import Base
 from tests.config import (
     TEST_POSTGRE_DB_NAME,
     TEST_POSTGRE_HOST,
@@ -29,16 +30,12 @@ async_sessionmaker = sessionmaker(
 )  # expire_on_commit: не хотим новые запросы для уже закоммиченных объектов
 
 
-async def init_models():
-    async with engine.begin() as conn:
-        print("Initializing models...")
-        await conn.run_sync(Base.metadata.create_all)
-        print("Models has been initialized.")
+async def init_models(real_alembic_config: Config):
+    upgrade(real_alembic_config, "head")
 
 
-async def drop_models():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+async def drop_models(real_alembic_config: Config):
+    downgrade(real_alembic_config, "base")
 
 
 async def create_database():
@@ -55,12 +52,6 @@ async def create_database():
         print("Database already exists")
     finally:
         await conn.close()
-
-
-# DI
-async def get_test_session() -> AsyncGenerator[AsyncSession, Any]:
-    async with async_sessionmaker() as async_session:
-        yield async_session
 
 
 @asynccontextmanager
@@ -86,10 +77,3 @@ async def get_nested_test_session() -> AsyncGenerator[AsyncSession, Any]:
             print("Rollback enclosing transaction.")
         print("Close enclosing transaction.")
     print("Connection close.")
-
-
-# for manual use in tests (without DI, needs ACM protocol):
-@asynccontextmanager
-async def get_test_session_acm() -> AsyncGenerator[AsyncSession, Any]:
-    async with async_sessionmaker() as session:
-        yield session
